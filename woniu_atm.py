@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import time
+from typing import TextIO
+
 import pymysql
+
 # 保存账户信息 登录状态
-account = {'name': '',  'card_id': '', 'balance': 0, 'today_money': 0}
+account = {'name': '', 'card_id': '', 'balance': 0, 'today_money': 0}
 
 # 定义最大取款金额
 MAX_MONEY = 5000.00
@@ -90,7 +93,8 @@ def sign_up():
             print('输入次数超过3次')
             return False
     balance = 0
-    sql = f'insert into account(name, password, card_id, balance) values ("{name}", "{password}", "{card_id}", "{balance}")'
+    sql = f'insert into account(name, password, card_id, balance) \
+          values ("{name}", "{password}", "{card_id}", "{balance}")'
     cursor.execute(sql)
     conn.commit()
     print('注册成功')
@@ -173,10 +177,12 @@ def draw():
             return False
     account['balance'] -= money
     account['today_money'] += money
-    sql = f'update account set balance = {account["balance"]}, today_money = {account["today_money"]} where card_id = {account["card_id"]}'
+    sql = f'update account set balance = {account["balance"]}, today_money = {account["today_money"]} \
+          where card_id = {account["card_id"]}'
     cursor.execute(sql)
     conn.commit()
     print(f'取款成功，你的余额为：{account["balance"]}')
+    f = ''
     try:
         f = open('./data/logs.txt', 'a')
         log_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '=======' + f'取款: {money}'
@@ -221,6 +227,7 @@ def deposit():
         cursor.execute(sql)
         conn.commit()
         print(f'存款成功，你的余额为：{account["balance"]}')
+        f = ''
         try:
             f = open('./data/logs.txt', 'a')
             log_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '=======' + f'存款: {money}'
@@ -236,6 +243,7 @@ def transfer():
     """ 转账 """
     flag = False
     to_username = ''
+    transfer_money = ''
     for i in range(3):
         card_id = input('请输入转账的卡号：')
         sql = f'select name, card_id from account where card_id = {card_id}'
@@ -279,6 +287,7 @@ def transfer():
     cursor.execute(sql)
     cursor.commit()
     print(f'转账成功，向{to_username}转账{transfer_money}')
+    f = ''
     try:
         f = open('./data/logs.txt', 'a')
         log_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '=======' + f'向{to_username}转账{transfer_money}'
@@ -291,12 +300,12 @@ def transfer():
 
 def check_welcome_id():
     while True:
-        id = input('请输入：')
-        if id.isdecimal() and int(id) in (1, 2, 3):
+        menu_id = input('请输入：')
+        if menu_id.isdecimal() and int(menu_id) in (1, 2, 3):
             break
         else:
             print('请正确输入编号')
-    return int(id)
+    return int(menu_id)
 
 
 def check_menu_id():
@@ -325,14 +334,15 @@ def show_logs():
     finally:
         f.close()
 
+
 def main():
     """ 程序入口"""
     while True:
         welcome()
-        id = check_welcome_id()
-        if id == 1:
+        main_id = check_welcome_id()
+        if main_id == 1:
             sign_up()
-        elif id == 2:
+        elif main_id == 2:
             if not login():
                 continue
             while True:
@@ -352,7 +362,7 @@ def main():
                     break
                 elif menu_id == 7:
                     logout()
-        elif id == 3:
+        elif main_id == 3:
             logout()
 
 
