@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import time
+from functools import wraps
 from typing import TextIO
 
 import pymysql
 
 # 保存账户信息 登录状态
-account = {'name': '', 'card_id': '', 'balance': 0, 'today_money': 0}
+account = {'name': 'nobody', 'card_id': '', 'balance': 0, 'today_money': 0}
 
 # 定义最大取款金额
 MAX_MONEY = 5000.00
@@ -40,6 +41,24 @@ TODAY_MONEY = 20000
 # 数据库连接
 conn = pymysql.connect(user='woniu', password='123456', database='woniu_atm', charset='utf8')
 cursor = conn.cursor()
+
+
+def log_1(*, path):
+    def func_decorator(func):
+        @wraps(func)
+        def wrap_function(*args, **kargs):
+            logs = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            result = func(*args, **kargs)
+            if result:
+                logs += '\t =====> {0} {1}'.format(result[0], result[1] + ' 成功')
+                with open(path, 'a') as f:
+                    f.write(logs + '\r\n')
+
+            return result
+
+        return wrap_function
+
+    return func_decorator
 
 
 def welcome():
@@ -139,28 +158,29 @@ def show_info():
     print(f'单日取款金额：{account.get("today_money")}')
 
 
+@log_1(path='./data/draw.txt')
 def draw():
     """ 取款"""
     if account['today_money'] >= TODAY_MONEY:
         print(f'您的当日取款金额已经达到最高限度{TODAY_MONEY}')
-        return False
+        return None
     money = input('请输入取款金额：')
     if not money.isdecimal():
         print('输入的金额只能是正整数')
-        return False
+        return None
     money = int(money)
     if money % 100 != 0:
         print('输入金额只能是100的倍数')
-        return False
+        return None
     if money <= MIN_MONEY:
         print('输入的金额必须大于零')
-        return False
+        return None
     if money > MAX_MONEY:
         print(f'最大取款金额为{MAX_MONEY}')
-        return False
+        return None
     if account.get('balance') < money:
         print('余额不足')
-        return False
+        return None
 
     print(f'您输入的取款金额为：{money}')
 
@@ -170,11 +190,11 @@ def draw():
         if ack == ACK:
             break
         if ack == NO:
-            return False
+            return None
         end += 1
         if end >= 3:
             print('您的输入次数超过3次，取款失败')
-            return False
+            return None
     account['balance'] -= money
     account['today_money'] += money
     sql = f'update account set balance = {account["balance"]}, today_money = {account["today_money"]} \
@@ -182,18 +202,14 @@ def draw():
     cursor.execute(sql)
     conn.commit()
     print(f'取款成功，你的余额为：{account["balance"]}')
-    f = ''
-    try:
-        f = open('./data/logs.txt', 'a')
-        log_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '=======' + f'取款: {money}'
-        f.writelines(log_str + '\n')
-    except:
-        print('打开日志文件异常')
-    finally:
-        f.close()
-    return True
+
+    # 构建返回数据 格式：用户名（name），做了什么事情（do）, 结果是什么
+    result = [account['name'], f'取款 {money}']
+
+    return result
 
 
+@log_1(path='./data/deposit.txt')
 def deposit():
     """ 存款 """
     while True:
@@ -217,28 +233,23 @@ def deposit():
             if ack == ACK:
                 break
             if ack == NO:
-                return False
+                return None
             end += 1
             if end >= 3:
                 print('您的输入次数超过3次，存款失败')
-                return False
+                return None
         account['balance'] += money
         sql = f'update account set balance = {account["balance"]} where card_id = {account["card_id"]}'
         cursor.execute(sql)
         conn.commit()
         print(f'存款成功，你的余额为：{account["balance"]}')
-        f = ''
-        try:
-            f = open('./data/logs.txt', 'a')
-            log_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '=======' + f'存款: {money}'
-            f.writelines(log_str + '\n')
-        except:
-            print('打开日志文件异常')
-        finally:
-            f.close()
-        return True
+
+        result = [account['name'], f'存款 {money}']
+
+        return result
 
 
+@log_1(path='./data/transfer.txt')
 def transfer():
     """ 转账 """
     flag = False
@@ -283,19 +294,14 @@ def transfer():
         break
     if not flag:
         return False
-    sql = f'update user set balance = {transfer_money} where card_id = {account["card_id"]}'
+    sql = f'update account set balance = {transfer_money} where card_id = {account["card_id"]}'
     cursor.execute(sql)
-    cursor.commit()
-    print(f'转账成功，向{to_username}转账{transfer_money}')
-    f = ''
-    try:
-        f = open('./data/logs.txt', 'a')
-        log_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '=======' + f'向{to_username}转账{transfer_money}'
-        f.writelines(log_str + '\n')
-    except:
-        print('打开日志文件异常')
-    finally:
-        f.close()
+    conn.commit()
+    print(f'转账成功，向{to_username} 转账 {transfer_money}')
+
+    result = [account['name'], f'向{to_username} 转账 {transfer_money}']
+
+    return result
 
 
 def check_welcome_id():
